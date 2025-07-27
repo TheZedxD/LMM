@@ -60,8 +60,10 @@ from PyQt5.QtCore import (
     QFileInfo,
     QPoint,
     QRectF,
+    QSize,
     Qt,
     QTimer,
+    QUrl,
     pyqtSignal,
 )
 from PyQt5.QtGui import (
