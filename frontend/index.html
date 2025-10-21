@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LMM - Lightweight Movie Maker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <h1>🎬 LMM</h1>
+                <span class="subtitle">Lightweight Movie Maker</span>
+            </div>
+            <div class="header-actions">
+                <button id="newProject" class="btn btn-secondary">New Project</button>
+                <button id="saveProject" class="btn btn-secondary">Save Project</button>
+                <button id="loadProject" class="btn btn-secondary">Load Project</button>
+                <button id="exportBtn" class="btn btn-primary">Export Video</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar - Media Library -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Media Library</h2>
+                    <button id="uploadBtn" class="btn btn-small">+ Add Media</button>
+                    <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*" style="display: none;">
+                </div>
+                <div id="mediaLibrary" class="media-library">
+                    <div class="empty-state">
+                        <p>📁</p>
+                        <p>Drag and drop media files here<br>or click "Add Media"</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center - Preview and Timeline -->
+            <main class="main-area">
+                <!-- Preview Area -->
+                <div class="preview-container">
+                    <div id="videoPreview" class="video-preview">
+                        <video id="previewPlayer" controls></video>
+                        <div class="preview-placeholder">
+                            <p>🎥</p>
+                            <p>Add clips to timeline to preview</p>
+                        </div>
+                    </div>
+                    <div class="preview-controls">
+                        <button id="playBtn" class="control-btn">▶</button>
+                        <button id="pauseBtn" class="control-btn">⏸</button>
+                        <button id="stopBtn" class="control-btn">⏹</button>
+                        <div class="time-display">
+                            <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Area -->
+                <div class="timeline-container">
+                    <div class="timeline-header">
+                        <h3>Timeline</h3>
+                        <div class="timeline-controls">
+                            <button id="zoomIn" class="btn-icon" title="Zoom In">+</button>
+                            <button id="zoomOut" class="btn-icon" title="Zoom Out">-</button>
+                            <button id="clearTimeline" class="btn-icon" title="Clear Timeline">🗑</button>
+                        </div>
+                    </div>
+                    <div id="timeline" class="timeline">
+                        <div class="timeline-ruler" id="timelineRuler"></div>
+                        <div class="timeline-track" id="videoTrack" data-track="video">
+                            <div class="track-label">Video</div>
+                            <div class="track-content" data-track-type="video"></div>
+                        </div>
+                        <div class="timeline-track" id="audioTrack" data-track="audio">
+                            <div class="track-label">Audio</div>
+                            <div class="track-content" data-track-type="audio"></div>
+                        </div>
+                        <div class="playhead" id="playhead"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar - Properties -->
+            <aside class="properties-panel">
+                <h2>Properties</h2>
+                <div id="propertiesContent" class="properties-content">
+                    <div class="empty-state-small">
+                        <p>Select a clip to edit properties</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Load Project Modal -->
+    <div id="loadProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Load Project</h2>
+                <button class="close-modal" data-modal="loadProjectModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="projectsList" class="projects-list">
+                    <p style="text-align: center; color: #666;">Loading projects...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="close-modal btn btn-secondary" data-modal="loadProjectModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Export Video</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Output Format:</label>
+                    <select id="exportFormat">
+                        <option value="mp4">MP4 (H.264)</option>
+                        <option value="webm">WebM</option>
+                        <option value="avi">AVI</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quality:</label>
+                    <select id="exportQuality">
+                        <option value="high">High (1080p)</option>
+                        <option value="medium">Medium (720p)</option>
+                        <option value="low">Low (480p)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Filename:</label>
+                    <input type="text" id="exportFilename" value="my-video" placeholder="Enter filename">
+                </div>
+                <div id="exportProgress" class="progress-bar" style="display: none;">
+                    <div class="progress-fill"></div>
+                    <span class="progress-text">0%</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelExport" class="btn btn-secondary">Cancel</button>
+                <button id="startExport" class="btn btn-primary">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

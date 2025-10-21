@@ -1,0 +1,21 @@
+[Unit]
+Description=LMM Video Editor Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/LMM
+ExecStart=/usr/bin/node /home/%i/LMM/backend/server.js
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lmm-video-editor
+
+[Install]
+WantedBy=multi-user.target
