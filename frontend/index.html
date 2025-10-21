@@ -18,6 +18,13 @@
                 <button id="newProject" class="btn btn-secondary">New Project</button>
                 <button id="saveProject" class="btn btn-secondary">Save Project</button>
                 <button id="loadProject" class="btn btn-secondary">Load Project</button>
+                <div class="toolbar-divider"></div>
+                <button id="splitBtn" class="btn btn-icon" title="Split (S)">✂️</button>
+                <button id="cutBtn" class="btn btn-icon" title="Cut (Ctrl+X)">✂️</button>
+                <button id="copyBtn" class="btn btn-icon" title="Copy (Ctrl+C)">📋</button>
+                <button id="pasteBtn" class="btn btn-icon" title="Paste (Ctrl+V)">📄</button>
+                <button id="duplicateBtn" class="btn btn-icon" title="Duplicate (Ctrl+D)">⎘</button>
+                <div class="toolbar-divider"></div>
                 <button id="exportBtn" class="btn btn-primary">Export Video</button>
             </div>
         </header>
@@ -65,6 +72,9 @@
                     <div class="timeline-header">
                         <h3>Timeline</h3>
                         <div class="timeline-controls">
+                            <button id="addVideoTrack" class="btn-icon" title="Add Video Track">+ 🎬</button>
+                            <button id="addAudioTrack" class="btn-icon" title="Add Audio Track">+ 🎵</button>
+                            <div class="toolbar-divider-small"></div>
                             <button id="zoomIn" class="btn-icon" title="Zoom In">+</button>
                             <button id="zoomOut" class="btn-icon" title="Zoom Out">-</button>
                             <button id="clearTimeline" class="btn-icon" title="Clear Timeline">🗑</button>
@@ -72,14 +82,7 @@
                     </div>
                     <div id="timeline" class="timeline">
                         <div class="timeline-ruler" id="timelineRuler"></div>
-                        <div class="timeline-track" id="videoTrack" data-track="video">
-                            <div class="track-label">Video</div>
-                            <div class="track-content" data-track-type="video"></div>
-                        </div>
-                        <div class="timeline-track" id="audioTrack" data-track="audio">
-                            <div class="track-label">Audio</div>
-                            <div class="track-content" data-track-type="audio"></div>
-                        </div>
+                        <div id="tracksContainer" class="tracks-container"></div>
                         <div class="playhead" id="playhead"></div>
                     </div>
                 </div>

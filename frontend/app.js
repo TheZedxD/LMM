@@ -12,6 +12,18 @@ class VideoEditor {
         this.projectId = null;
         this.projectName = 'Untitled Project';
 
+        // Multi-track support
+        this.tracks = [
+            { id: 'video-1', name: 'Video 1', type: 'video' },
+            { id: 'video-2', name: 'Video 2', type: 'video' },
+            { id: 'audio-1', name: 'Audio 1', type: 'audio' },
+            { id: 'audio-2', name: 'Audio 2', type: 'audio' }
+        ];
+
+        // Clipboard for cut/copy/paste
+        this.clipboard = null;
+        this.clipboardAction = null; // 'cut' or 'copy'
+
         this.init();
     }
 
@@ -27,8 +39,7 @@ class VideoEditor {
             videoPreview: document.getElementById('videoPreview'),
             previewPlayer: document.getElementById('previewPlayer'),
             timeline: document.getElementById('timeline'),
-            videoTrack: document.querySelector('[data-track-type="video"]'),
-            audioTrack: document.querySelector('[data-track-type="audio"]'),
+            tracksContainer: document.getElementById('tracksContainer'),
             playBtn: document.getElementById('playBtn'),
             pauseBtn: document.getElementById('pauseBtn'),
             stopBtn: document.getElementById('stopBtn'),
@@ -46,12 +57,15 @@ class VideoEditor {
             saveProject: document.getElementById('saveProject'),
             loadProject: document.getElementById('loadProject'),
             loadProjectModal: document.getElementById('loadProjectModal'),
-            projectsList: document.getElementById('projectsList')
+            projectsList: document.getElementById('projectsList'),
+            addVideoTrack: document.getElementById('addVideoTrack'),
+            addAudioTrack: document.getElementById('addAudioTrack')
         };
 
+        this.renderTracks();
         this.setupEventListeners();
         this.setupKeyboardShortcuts();
-        this.setupDragAndDrop();
+        this.setupContextMenu();
         this.drawTimelineRuler();
     }
 
@@ -122,9 +136,62 @@ class VideoEditor {
             this.elements.mediaLibrary.classList.remove('drag-over');
             this.handleFileUpload(e.dataTransfer.files);
         });
+
+        // Track management
+        if (this.elements.addVideoTrack) {
+            this.elements.addVideoTrack.addEventListener('click', () => this.addTrack('video'));
+        }
+        if (this.elements.addAudioTrack) {
+            this.elements.addAudioTrack.addEventListener('click', () => this.addTrack('audio'));
+        }
+
+        // Editing tools
+        const splitBtn = document.getElementById('splitBtn');
+        const cutBtn = document.getElementById('cutBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const pasteBtn = document.getElementById('pasteBtn');
+        const duplicateBtn = document.getElementById('duplicateBtn');
+
+        if (splitBtn) splitBtn.addEventListener('click', () => this.splitClip());
+        if (cutBtn) cutBtn.addEventListener('click', () => this.cutClip());
+        if (copyBtn) copyBtn.addEventListener('click', () => this.copyClip());
+        if (pasteBtn) pasteBtn.addEventListener('click', () => this.pasteClip());
+        if (duplicateBtn) duplicateBtn.addEventListener('click', () => this.duplicateClip());
     }
 
-    setupDragAndDrop() {
+    renderTracks() {
+        if (!this.elements.tracksContainer) return;
+
+        this.elements.tracksContainer.innerHTML = '';
+
+        this.tracks.forEach((track, index) => {
+            const trackEl = document.createElement('div');
+            trackEl.className = 'timeline-track';
+            trackEl.dataset.trackId = track.id;
+            trackEl.dataset.trackType = track.type;
+
+            trackEl.innerHTML = `
+                <div class="track-label">
+                    <span class="track-name">${track.name}</span>
+                    <button class="track-remove-btn" data-track-id="${track.id}" title="Remove track">×</button>
+                </div>
+                <div class="track-content" data-track-id="${track.id}"></div>
+            `;
+
+            // Add remove track listener
+            const removeBtn = trackEl.querySelector('.track-remove-btn');
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeTrack(track.id);
+            });
+
+            this.elements.tracksContainer.appendChild(trackEl);
+        });
+
+        this.setupTrackDropZones();
+    }
+
+    setupTrackDropZones() {
         // Enable drag from media library to timeline
         this.elements.mediaLibrary.addEventListener('dragstart', (e) => {
             if (e.target.classList.contains('media-item')) {
@@ -137,30 +204,139 @@ class VideoEditor {
             e.target.classList.remove('dragging');
         });
 
-        // Timeline drop zones
-        [this.elements.videoTrack, this.elements.audioTrack].forEach(track => {
-            track.addEventListener('dragover', (e) => {
+        // Timeline drop zones for all tracks
+        document.querySelectorAll('.track-content').forEach(trackContent => {
+            trackContent.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                track.classList.add('drag-over');
+                trackContent.classList.add('drag-over');
             });
 
-            track.addEventListener('dragleave', () => {
-                track.classList.remove('drag-over');
+            trackContent.addEventListener('dragleave', () => {
+                trackContent.classList.remove('drag-over');
             });
 
-            track.addEventListener('drop', (e) => {
+            trackContent.addEventListener('drop', (e) => {
                 e.preventDefault();
-                track.classList.remove('drag-over');
+                trackContent.classList.remove('drag-over');
 
                 const mediaId = e.dataTransfer.getData('mediaId');
                 if (mediaId) {
-                    const rect = track.getBoundingClientRect();
+                    const rect = trackContent.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const time = x / this.pixelsPerSecond;
-                    this.addClipToTimeline(mediaId, track.dataset.trackType, time);
+                    const trackId = trackContent.dataset.trackId;
+                    this.addClipToTimeline(mediaId, trackId, time);
                 }
             });
         });
+    }
+
+    addTrack(type) {
+        const count = this.tracks.filter(t => t.type === type).length + 1;
+        const track = {
+            id: `${type}-${Date.now()}`,
+            name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${count}`,
+            type: type
+        };
+        this.tracks.push(track);
+        this.renderTracks();
+        this.refreshTimeline();
+    }
+
+    removeTrack(trackId) {
+        // Don't allow removing if it's the last track of its type
+        const track = this.tracks.find(t => t.id === trackId);
+        if (!track) return;
+
+        const tracksOfType = this.tracks.filter(t => t.type === track.type);
+        if (tracksOfType.length <= 1) {
+            alert(`Cannot remove the last ${track.type} track`);
+            return;
+        }
+
+        // Check if track has clips
+        const hasClips = this.timelineClips.some(c => c.trackId === trackId);
+        if (hasClips && !confirm('This track has clips. Remove anyway?')) {
+            return;
+        }
+
+        // Remove clips on this track
+        this.timelineClips = this.timelineClips.filter(c => c.trackId !== trackId);
+
+        // Remove track
+        this.tracks = this.tracks.filter(t => t.id !== trackId);
+        this.renderTracks();
+        this.refreshTimeline();
+    }
+
+    setupContextMenu() {
+        // Create context menu element
+        const contextMenu = document.createElement('div');
+        contextMenu.id = 'clipContextMenu';
+        contextMenu.className = 'context-menu';
+        contextMenu.innerHTML = `
+            <div class="context-menu-item" data-action="split">Split at Playhead</div>
+            <div class="context-menu-item" data-action="cut">Cut</div>
+            <div class="context-menu-item" data-action="copy">Copy</div>
+            <div class="context-menu-item" data-action="paste">Paste</div>
+            <div class="context-menu-item" data-action="duplicate">Duplicate</div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="delete">Delete</div>
+        `;
+        document.body.appendChild(contextMenu);
+
+        // Hide menu when clicking outside
+        document.addEventListener('click', () => {
+            contextMenu.classList.remove('active');
+        });
+
+        // Handle menu item clicks
+        contextMenu.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action) {
+                this.handleContextMenuAction(action);
+                contextMenu.classList.remove('active');
+            }
+        });
+
+        // Store reference
+        this.contextMenu = contextMenu;
+    }
+
+    showContextMenu(e, clipId) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        this.selectClip(clipId);
+
+        this.contextMenu.style.left = e.pageX + 'px';
+        this.contextMenu.style.top = e.pageY + 'px';
+        this.contextMenu.classList.add('active');
+    }
+
+    handleContextMenuAction(action) {
+        switch(action) {
+            case 'split':
+                this.splitClip();
+                break;
+            case 'cut':
+                this.cutClip();
+                break;
+            case 'copy':
+                this.copyClip();
+                break;
+            case 'paste':
+                this.pasteClip();
+                break;
+            case 'duplicate':
+                this.duplicateClip();
+                break;
+            case 'delete':
+                if (this.selectedClip) {
+                    this.deleteClip(this.selectedClip.id);
+                }
+                break;
+        }
     }
 
     async handleFileUpload(files) {
@@ -226,15 +402,9 @@ class VideoEditor {
         this.elements.mediaLibrary.appendChild(mediaEl);
     }
 
-    addClipToTimeline(mediaId, trackType, startTime) {
+    addClipToTimeline(mediaId, trackId, startTime) {
         const mediaItem = this.mediaItems.find(m => m.id === mediaId);
         if (!mediaItem) return;
-
-        // Check if media type matches track
-        if (trackType === 'video' && mediaItem.type === 'audio') {
-            // Move to audio track instead
-            trackType = 'audio';
-        }
 
         const clip = {
             id: this.generateId(),
@@ -244,7 +414,7 @@ class VideoEditor {
             duration: mediaItem.duration || 5,
             trimStart: 0,
             trimEnd: mediaItem.duration || 5,
-            track: trackType
+            trackId: trackId
         };
 
         this.timelineClips.push(clip);
@@ -256,7 +426,8 @@ class VideoEditor {
         const mediaItem = this.mediaItems.find(m => m.id === clip.mediaId);
         if (!mediaItem) return;
 
-        const track = clip.track === 'video' ? this.elements.videoTrack : this.elements.audioTrack;
+        const trackContent = document.querySelector(`[data-track-id="${clip.trackId}"].track-content`);
+        if (!trackContent) return;
 
         const clipEl = document.createElement('div');
         clipEl.className = `timeline-clip ${clip.type}`;
@@ -283,13 +454,18 @@ class VideoEditor {
             this.selectClip(clip.id);
         });
 
+        // Right-click for context menu
+        clipEl.addEventListener('contextmenu', (e) => {
+            this.showContextMenu(e, clip.id);
+        });
+
         // Make draggable
         this.makeClipDraggable(clipEl, clip);
 
         // Make resizable
         this.makeClipResizable(clipEl, clip);
 
-        track.appendChild(clipEl);
+        trackContent.appendChild(clipEl);
     }
 
     makeClipDraggable(clipEl, clip) {
@@ -506,14 +682,127 @@ class VideoEditor {
     }
 
     refreshTimeline() {
-        // Clear and redraw all clips
-        this.elements.videoTrack.innerHTML = '';
-        this.elements.audioTrack.innerHTML = '';
+        // Clear all track contents
+        document.querySelectorAll('.track-content').forEach(track => {
+            track.innerHTML = '';
+        });
 
+        // Redraw all clips
         this.timelineClips.forEach(clip => {
             this.renderTimelineClip(clip);
         });
 
+        this.updateTimelineDuration();
+    }
+
+    // Editing Tools
+    splitClip() {
+        if (!this.selectedClip) {
+            alert('Select a clip first');
+            return;
+        }
+
+        const playheadTime = this.currentTime;
+        const clip = this.selectedClip;
+
+        // Check if playhead is within clip bounds
+        if (playheadTime <= clip.start || playheadTime >= clip.start + clip.duration) {
+            alert('Playhead must be within the clip bounds');
+            return;
+        }
+
+        // Calculate split point relative to clip
+        const splitPoint = playheadTime - clip.start;
+
+        // Create second clip
+        const newClip = {
+            id: this.generateId(),
+            mediaId: clip.mediaId,
+            type: clip.type,
+            start: playheadTime,
+            duration: clip.duration - splitPoint,
+            trimStart: clip.trimStart + splitPoint,
+            trimEnd: clip.trimEnd,
+            trackId: clip.trackId
+        };
+
+        // Update original clip
+        clip.duration = splitPoint;
+        clip.trimEnd = clip.trimStart + splitPoint;
+
+        // Add new clip
+        this.timelineClips.push(newClip);
+
+        // Refresh
+        this.refreshTimeline();
+        this.selectClip(newClip.id);
+    }
+
+    cutClip() {
+        if (!this.selectedClip) {
+            alert('Select a clip first');
+            return;
+        }
+
+        this.clipboard = JSON.parse(JSON.stringify(this.selectedClip));
+        this.clipboardAction = 'cut';
+
+        this.deleteClip(this.selectedClip.id);
+    }
+
+    copyClip() {
+        if (!this.selectedClip) {
+            alert('Select a clip first');
+            return;
+        }
+
+        this.clipboard = JSON.parse(JSON.stringify(this.selectedClip));
+        this.clipboardAction = 'copy';
+    }
+
+    pasteClip() {
+        if (!this.clipboard) {
+            alert('Nothing to paste');
+            return;
+        }
+
+        // Paste at playhead position or at the end
+        const pasteTime = this.currentTime || 0;
+
+        const newClip = {
+            ...this.clipboard,
+            id: this.generateId(),
+            start: pasteTime
+        };
+
+        this.timelineClips.push(newClip);
+        this.renderTimelineClip(newClip);
+        this.selectClip(newClip.id);
+        this.updateTimelineDuration();
+
+        // Clear clipboard if it was a cut operation
+        if (this.clipboardAction === 'cut') {
+            this.clipboard = null;
+            this.clipboardAction = null;
+        }
+    }
+
+    duplicateClip() {
+        if (!this.selectedClip) {
+            alert('Select a clip first');
+            return;
+        }
+
+        const clip = this.selectedClip;
+        const newClip = {
+            ...clip,
+            id: this.generateId(),
+            start: clip.start + clip.duration + 0.1 // Offset slightly
+        };
+
+        this.timelineClips.push(newClip);
+        this.renderTimelineClip(newClip);
+        this.selectClip(newClip.id);
         this.updateTimelineDuration();
     }
 
@@ -749,6 +1038,11 @@ class VideoEditor {
 
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
+            // Ignore shortcuts when typing in input fields
+            if (e.target.tagName === 'INPUT' && !['Space'].includes(e.code)) {
+                return;
+            }
+
             // Ctrl/Cmd + S - Save Project
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
@@ -767,6 +1061,30 @@ class VideoEditor {
                 this.newProject();
             }
 
+            // Ctrl/Cmd + X - Cut
+            if ((e.ctrlKey || e.metaKey) && e.key === 'x' && this.selectedClip) {
+                e.preventDefault();
+                this.cutClip();
+            }
+
+            // Ctrl/Cmd + C - Copy
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c' && this.selectedClip) {
+                e.preventDefault();
+                this.copyClip();
+            }
+
+            // Ctrl/Cmd + V - Paste
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v' && this.clipboard) {
+                e.preventDefault();
+                this.pasteClip();
+            }
+
+            // Ctrl/Cmd + D - Duplicate
+            if ((e.ctrlKey || e.metaKey) && e.key === 'd' && this.selectedClip) {
+                e.preventDefault();
+                this.duplicateClip();
+            }
+
             // Space - Play/Pause
             if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
                 e.preventDefault();
@@ -778,8 +1096,15 @@ class VideoEditor {
             }
 
             // Delete - Delete selected clip
-            if (e.key === 'Delete' && this.selectedClip) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedClip && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
                 this.deleteClip(this.selectedClip.id);
+            }
+
+            // S - Split at playhead
+            if (e.key === 's' && !e.ctrlKey && !e.metaKey && this.selectedClip && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                this.splitClip();
             }
 
             // + - Zoom in
@@ -803,6 +1128,7 @@ class VideoEditor {
             created: new Date().toISOString(),
             mediaItems: this.mediaItems,
             timelineClips: this.timelineClips,
+            tracks: this.tracks,
             settings: {
                 zoom: this.zoom,
                 pixelsPerSecond: this.pixelsPerSecond
@@ -881,12 +1207,34 @@ class VideoEditor {
                 this.mediaItems = projectData.mediaItems || [];
                 this.timelineClips = projectData.timelineClips || [];
 
+                // Load tracks or use default
+                if (projectData.tracks && projectData.tracks.length > 0) {
+                    this.tracks = projectData.tracks;
+                } else {
+                    // Migrate old projects to new track system
+                    this.tracks = [
+                        { id: 'video-1', name: 'Video 1', type: 'video' },
+                        { id: 'video-2', name: 'Video 2', type: 'video' },
+                        { id: 'audio-1', name: 'Audio 1', type: 'audio' },
+                        { id: 'audio-2', name: 'Audio 2', type: 'audio' }
+                    ];
+
+                    // Migrate old clips to new format
+                    this.timelineClips.forEach(clip => {
+                        if (clip.track && !clip.trackId) {
+                            clip.trackId = clip.track === 'video' ? 'video-1' : 'audio-1';
+                            delete clip.track;
+                        }
+                    });
+                }
+
                 if (projectData.settings) {
                     this.zoom = projectData.settings.zoom || 1;
                     this.pixelsPerSecond = projectData.settings.pixelsPerSecond || 50;
                 }
 
                 // Rebuild UI
+                this.renderTracks();
                 this.rebuildMediaLibrary();
                 this.refreshTimeline();
                 this.updateProperties();
