@@ -1,13 +1,13 @@
 {
   "name": "lmm-video-editor",
   "version": "1.0.0",
-  "description": "Lightweight Movie Maker - Web-based video editor for Linux",
+  "description": "Lightweight Movie Maker - Cross-platform web-based video editor for Windows, Linux, and Raspberry Pi",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js"
   },
-  "keywords": ["video", "editor", "linux", "ffmpeg"],
+  "keywords": ["video", "editor", "linux", "windows", "raspberry-pi", "ffmpeg", "cross-platform"],
   "author": "",
   "license": "MIT",
   "dependencies": {
