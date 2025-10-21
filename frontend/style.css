@@ -46,6 +46,21 @@ body {
 .header-actions {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: #555;
+    margin: 0 0.25rem;
+}
+
+.toolbar-divider-small {
+    width: 1px;
+    height: 16px;
+    background: #555;
+    margin: 0 0.25rem;
 }
 
 /* Buttons */
@@ -303,12 +318,36 @@ body {
 .track-label {
     width: 80px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: #252525;
     border-right: 1px solid #404040;
     font-size: 0.75rem;
     font-weight: 500;
+    padding: 0.25rem;
+    position: relative;
+}
+
+.track-name {
+    text-align: center;
+    margin-bottom: 0.25rem;
+}
+
+.track-remove-btn {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ff5555;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 0.125rem 0.375rem;
+    transition: all 0.2s;
+}
+
+.track-remove-btn:hover {
+    background: #ff5555;
+    color: white;
 }
 
 .track-content {
@@ -336,8 +375,11 @@ body {
 }
 
 .timeline-clip.selected {
-    border-color: #fff;
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    border-color: #ffff00;
+    border-width: 3px;
+    box-shadow: 0 0 20px rgba(255, 255, 0, 0.8), inset 0 0 10px rgba(255, 255, 0, 0.3);
+    outline: 2px solid #ffff00;
+    outline-offset: 2px;
 }
 
 .timeline-clip.audio {
@@ -698,4 +740,44 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: #2d2d2d;
+    border: 1px solid #555;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    padding: 0.25rem 0;
+    min-width: 180px;
+    z-index: 2000;
+    display: none;
+}
+
+.context-menu.active {
+    display: block;
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.875rem;
+    color: #e0e0e0;
+}
+
+.context-menu-item:hover {
+    background: #404040;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #555;
+    margin: 0.25rem 0;
+}
+
+/* Tracks Container */
+.tracks-container {
+    position: relative;
 }
