@@ -1,24 +1,16 @@
 #!/bin/bash
 
-# LMM - Lightweight Movie Maker Installer for CachyOS/Arch Linux
+# LMM - Lightweight Movie Maker Installer for Linux
 # This script installs all dependencies and sets up the application
+# Supports: CachyOS, Arch Linux, Ubuntu, Debian, Fedora, and other distributions
 
 set -e
 
 echo "================================"
 echo "LMM Video Editor Installer"
+echo "Linux Edition"
 echo "================================"
 echo ""
-
-# Check if running on Arch-based system
-if ! command -v pacman &> /dev/null; then
-    echo "Error: This installer is designed for CachyOS/Arch Linux"
-    echo "Please install dependencies manually:"
-    echo "  - Node.js (v16 or higher)"
-    echo "  - npm"
-    echo "  - FFmpeg"
-    exit 1
-fi
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
@@ -26,28 +18,129 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+# Detect Linux distribution
+DISTRO="unknown"
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO=$ID
+fi
+
+echo "Detected distribution: $DISTRO"
+echo ""
+
+# Function to install on Arch-based systems (CachyOS, Arch, Manjaro, etc.)
+install_arch() {
+    echo "Installing for Arch-based system..."
+    echo ""
+
+    # Update package database
+    sudo pacman -Sy
+
+    # Install Node.js and npm
+    if ! command -v node &> /dev/null; then
+        echo "Installing Node.js and npm..."
+        sudo pacman -S --needed --noconfirm nodejs npm
+    else
+        echo "Node.js already installed: $(node --version)"
+    fi
+
+    # Install FFmpeg
+    if ! command -v ffmpeg &> /dev/null; then
+        echo "Installing FFmpeg..."
+        sudo pacman -S --needed --noconfirm ffmpeg
+    else
+        echo "FFmpeg already installed: $(ffmpeg -version | head -n1)"
+    fi
+}
+
+# Function to install on Debian-based systems (Ubuntu, Debian, etc.)
+install_debian() {
+    echo "Installing for Debian-based system..."
+    echo ""
+
+    # Update package database
+    sudo apt update
+
+    # Install Node.js and npm
+    if ! command -v node &> /dev/null; then
+        echo "Installing Node.js and npm..."
+        sudo apt install -y nodejs npm
+    else
+        echo "Node.js already installed: $(node --version)"
+    fi
+
+    # Install FFmpeg
+    if ! command -v ffmpeg &> /dev/null; then
+        echo "Installing FFmpeg..."
+        sudo apt install -y ffmpeg
+    else
+        echo "FFmpeg already installed: $(ffmpeg -version | head -n1)"
+    fi
+}
+
+# Function to install on Fedora-based systems
+install_fedora() {
+    echo "Installing for Fedora-based system..."
+    echo ""
+
+    # Install Node.js and npm
+    if ! command -v node &> /dev/null; then
+        echo "Installing Node.js and npm..."
+        sudo dnf install -y nodejs npm
+    else
+        echo "Node.js already installed: $(node --version)"
+    fi
+
+    # Install FFmpeg
+    if ! command -v ffmpeg &> /dev/null; then
+        echo "Installing FFmpeg..."
+        # Enable RPM Fusion for FFmpeg
+        sudo dnf install -y https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm 2>/dev/null || true
+        sudo dnf install -y ffmpeg
+    else
+        echo "FFmpeg already installed: $(ffmpeg -version | head -n1)"
+    fi
+}
+
 echo "Step 1: Installing system dependencies..."
 echo "You may be asked for your sudo password."
 echo ""
 
-# Update package database
-sudo pacman -Sy
+# Install based on detected distribution
+case $DISTRO in
+    arch|cachyos|manjaro|endeavouros)
+        install_arch
+        ;;
+    ubuntu|debian|linuxmint|pop)
+        install_debian
+        ;;
+    fedora|rhel|centos)
+        install_fedora
+        ;;
+    *)
+        echo "Distribution not automatically detected."
+        echo ""
 
-# Install Node.js and npm
-if ! command -v node &> /dev/null; then
-    echo "Installing Node.js and npm..."
-    sudo pacman -S --needed --noconfirm nodejs npm
-else
-    echo "Node.js already installed: $(node --version)"
-fi
-
-# Install FFmpeg
-if ! command -v ffmpeg &> /dev/null; then
-    echo "Installing FFmpeg..."
-    sudo pacman -S --needed --noconfirm ffmpeg
-else
-    echo "FFmpeg already installed: $(ffmpeg -version | head -n1)"
-fi
+        # Try to detect package manager
+        if command -v pacman &> /dev/null; then
+            echo "Found pacman, assuming Arch-based system..."
+            install_arch
+        elif command -v apt &> /dev/null; then
+            echo "Found apt, assuming Debian-based system..."
+            install_debian
+        elif command -v dnf &> /dev/null; then
+            echo "Found dnf, assuming Fedora-based system..."
+            install_fedora
+        else
+            echo "Error: Could not detect package manager"
+            echo "Please install dependencies manually:"
+            echo "  - Node.js (v16 or higher)"
+            echo "  - npm"
+            echo "  - FFmpeg"
+            exit 1
+        fi
+        ;;
+esac
 
 echo ""
 echo "Step 2: Installing Node.js dependencies..."

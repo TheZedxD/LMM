@@ -1,6 +1,12 @@
 # LMM - Lightweight Movie Maker
 
-A modern, web-based video editor for Linux built with Node.js and FFmpeg. LMM provides an intuitive interface similar to Clipchamp, designed specifically for Linux users who want a simple yet powerful video editing solution.
+A modern, cross-platform web-based video editor built with Node.js and FFmpeg. LMM provides an intuitive interface similar to Clipchamp, designed for users who want a simple yet powerful video editing solution.
+
+**Supported Platforms:**
+- Windows 10/11
+- CachyOS and other Arch-based Linux distributions
+- Ubuntu, Debian, and other Debian-based distributions
+- Raspberry Pi (Raspberry Pi OS)
 
 ## Features
 
@@ -26,53 +32,127 @@ A modern, web-based video editor for Linux built with Node.js and FFmpeg. LMM pr
 ## Installation
 
 ### Prerequisites
-- CachyOS, Arch Linux, or any Linux distribution
+All platforms require:
 - Node.js (v16 or higher)
-- npm
+- npm (usually comes with Node.js)
 - FFmpeg
 
-### Quick Install (CachyOS/Arch Linux)
+### Quick Install
 
-1. Clone or download this repository
-2. Run the installer script:
+#### Windows
 
-```bash
-cd LMM
-./install.sh
+1. Download or clone this repository
+2. Open PowerShell or Command Prompt as Administrator
+3. Navigate to the LMM directory and run:
+
+```batch
+install.bat
 ```
 
 The installer will:
+- Detect and use winget or Chocolatey package manager
+- Install Node.js and FFmpeg (if not already installed)
+- Install all Node.js dependencies
+- Create a desktop shortcut
+- Set up the application
+
+**Note:** If you don't have a package manager, the installer will provide manual installation instructions.
+
+#### Linux (CachyOS, Arch, Ubuntu, Debian, Fedora)
+
+1. Clone or download this repository
+2. Navigate to the LMM directory and run:
+
+```bash
+cd LMM
+chmod +x install.sh
+./install.sh
+```
+
+Or use the universal installer that auto-detects your distribution:
+
+```bash
+chmod +x install_platform.sh
+./install_platform.sh
+```
+
+The installer will:
+- Detect your Linux distribution automatically
 - Install Node.js, npm, and FFmpeg (if not already installed)
 - Install all Node.js dependencies
 - Create a desktop launcher
 - Set up the application
 
+#### Raspberry Pi
+
+For Raspberry Pi, use the dedicated installer optimized for ARM architecture:
+
+```bash
+cd LMM
+chmod +x install-rpi.sh
+./install-rpi.sh
+```
+
+The installer will:
+- Install Node.js LTS from NodeSource repository
+- Install FFmpeg
+- Install all Node.js dependencies
+- Create a desktop launcher
+- Provide performance tips for Raspberry Pi
+
+**Raspberry Pi Requirements:**
+- Raspberry Pi 3 or newer (Raspberry Pi 4 with 4GB+ RAM recommended)
+- Raspberry Pi OS (32-bit or 64-bit)
+
 ### Manual Installation
 
-If you're not on CachyOS/Arch, install dependencies manually:
+If the automatic installers don't work, install dependencies manually:
 
-#### Ubuntu/Debian:
+#### Windows (Manual):
+1. Install [Node.js LTS](https://nodejs.org/) (includes npm)
+2. Install [FFmpeg](https://www.gyan.dev/ffmpeg/builds/) and add to PATH
+3. Run `npm install` in the LMM directory
+
+#### Ubuntu/Debian (Manual):
 ```bash
 sudo apt update
 sudo apt install nodejs npm ffmpeg
 npm install
 ```
 
-#### Fedora:
+#### Fedora (Manual):
 ```bash
-sudo dnf install nodejs npm ffmpeg
+sudo dnf install nodejs npm
+sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+sudo dnf install ffmpeg
 npm install
 ```
 
-#### Other Distributions:
-Install Node.js, npm, and FFmpeg using your package manager, then run:
+#### macOS (Manual):
 ```bash
+brew install node ffmpeg
 npm install
 ```
 
 ## Usage
 
 ### Starting the Application
+
+#### Windows
+
+1. **Double-click the desktop shortcut** "LMM Video Editor"
+
+2. **Using the launcher:**
+   ```batch
+   run_server.bat
+   ```
+
+3. **Using npm:**
+   ```batch
+   npm start
+   ```
+
+#### Linux / Raspberry Pi
 
 1. **Using the launcher script:**
    ```bash
@@ -168,25 +248,69 @@ PORT=8080 npm start
 
 ## Troubleshooting
 
-### FFmpeg not found
+### Windows-Specific Issues
+
+**FFmpeg not found:**
+1. Check if FFmpeg is installed: `ffmpeg -version`
+2. If not in PATH, add FFmpeg bin folder to system PATH
+3. Restart terminal/command prompt after adding to PATH
+
+**Port already in use:**
+```batch
+set PORT=8080
+npm start
+```
+
+**Permission errors:**
+- Run Command Prompt or PowerShell as Administrator for installation
+
+### Linux-Specific Issues
+
+**FFmpeg not found:**
 Make sure FFmpeg is installed and in your PATH:
 ```bash
 ffmpeg -version
 ```
 
-### Port already in use
+**Port already in use:**
 Change the port:
 ```bash
 PORT=8080 npm start
 ```
 
-### Upload fails
-Check file size limit (default 500MB) and format support
+**Permission errors:**
+- Ensure you're not running as root
+- Check that the installer scripts have execute permissions (`chmod +x`)
 
-### Export fails
+### Raspberry Pi-Specific Issues
+
+**Performance issues:**
+- Use Raspberry Pi 4 with 4GB+ RAM for best performance
+- Export videos at lower quality settings (720p instead of 1080p)
+- Close other applications during video processing
+- Consider overclocking (with proper cooling)
+
+**Out of memory errors:**
+- Reduce video quality settings
+- Work with shorter clips
+- Increase swap file size
+
+### General Issues
+
+**Upload fails:**
+- Check file size limit (default 500MB) and format support
+- Ensure uploads directory has write permissions
+
+**Export fails:**
 - Ensure FFmpeg is properly installed
 - Check console for error messages
 - Verify clips have valid media files
+- Check available disk space in temp directory
+
+**Browser compatibility:**
+- Use modern browsers (Chrome, Firefox, Edge)
+- Enable JavaScript
+- Clear browser cache if issues persist
 
 ## Development
 
@@ -203,10 +327,23 @@ The application follows a client-server architecture:
 
 ## Performance Tips
 
+### All Platforms
 1. **Use appropriate quality settings**: Higher quality = longer export times
 2. **Trim clips before exporting**: Reduces processing time
 3. **Close other applications**: FFmpeg can be CPU-intensive
 4. **Use compatible formats**: MP4 files process faster than other formats
+
+### Windows
+- Disable Windows Defender real-time scanning for the temp folder during exports
+- Use SSD storage for better I/O performance
+- Consider upgrading to Windows 11 for better performance
+
+### Raspberry Pi
+- Use Raspberry Pi 4 with at least 4GB RAM
+- Enable hardware acceleration if available
+- Use lower resolution exports (720p recommended)
+- Export during off-peak usage times
+- Ensure adequate cooling to prevent thermal throttling
 
 ## Known Limitations
 
@@ -251,4 +388,4 @@ For issues and questions:
 
 ---
 
-**Made with ❤️ for the Linux community**
+**Made with ❤️ for video creators on Windows, Linux, and Raspberry Pi**
