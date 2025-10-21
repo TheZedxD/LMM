@@ -781,3 +781,153 @@ body {
 .tracks-container {
     position: relative;
 }
+
+/* Console Panel */
+.console-panel {
+    position: fixed;
+    bottom: -300px;
+    left: 0;
+    right: 0;
+    height: 300px;
+    background: #1a1a1a;
+    border-top: 2px solid #404040;
+    z-index: 1500;
+    display: flex;
+    flex-direction: column;
+    transition: bottom 0.3s ease;
+}
+
+.console-panel.active {
+    bottom: 0;
+}
+
+.console-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: #2d2d2d;
+    border-bottom: 1px solid #404040;
+}
+
+.console-header h3 {
+    font-size: 1rem;
+    color: #00aeff;
+    margin: 0;
+}
+
+.console-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.console-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+
+.console-entry {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 2px;
+    border-left: 3px solid transparent;
+}
+
+.console-entry:hover {
+    background: #202020;
+}
+
+.console-time {
+    color: #666;
+    min-width: 70px;
+}
+
+.console-type {
+    font-weight: bold;
+    min-width: 60px;
+}
+
+.console-message {
+    flex: 1;
+    color: #e0e0e0;
+}
+
+.console-info {
+    border-left-color: #00aeff;
+}
+
+.console-info .console-type {
+    color: #00aeff;
+}
+
+.console-warning {
+    border-left-color: #ffaa00;
+}
+
+.console-warning .console-type {
+    color: #ffaa00;
+}
+
+.console-error {
+    border-left-color: #ff5555;
+}
+
+.console-error .console-type {
+    color: #ff5555;
+}
+
+.console-debug {
+    border-left-color: #888;
+}
+
+.console-debug .console-type {
+    color: #888;
+}
+
+.console-toggle-btn {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: #2d2d2d;
+    color: #e0e0e0;
+    border: 2px solid #404040;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 1400;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.console-toggle-btn:hover {
+    background: #404040;
+    border-color: #00aeff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Quality Toggle Button */
+.quality-high {
+    background: #00aa00;
+    color: white;
+}
+
+.quality-high:hover {
+    background: #008800;
+}
+
+.quality-low {
+    background: #ff8800;
+    color: white;
+}
+
+.quality-low:hover {
+    background: #dd7700;
+}

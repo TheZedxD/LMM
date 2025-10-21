@@ -11,6 +11,8 @@ class VideoEditor {
         this.socket = null;
         this.projectId = null;
         this.projectName = 'Untitled Project';
+        this.previewQuality = 'high'; // 'low' or 'high'
+        this.dragDropListenersSet = false; // Track if drag/drop listeners are set
 
         // Multi-track support
         this.tracks = [
@@ -59,7 +61,12 @@ class VideoEditor {
             loadProjectModal: document.getElementById('loadProjectModal'),
             projectsList: document.getElementById('projectsList'),
             addVideoTrack: document.getElementById('addVideoTrack'),
-            addAudioTrack: document.getElementById('addAudioTrack')
+            addAudioTrack: document.getElementById('addAudioTrack'),
+            consolePanel: document.getElementById('consolePanel'),
+            consoleOutput: document.getElementById('consoleOutput'),
+            consoleToggle: document.getElementById('consoleToggle'),
+            consoleClear: document.getElementById('consoleClear'),
+            qualityToggle: document.getElementById('qualityToggle')
         };
 
         this.renderTracks();
@@ -67,6 +74,8 @@ class VideoEditor {
         this.setupKeyboardShortcuts();
         this.setupContextMenu();
         this.drawTimelineRuler();
+        this.setupConsole();
+        this.log('LMM Video Editor initialized successfully', 'info');
     }
 
     setupEventListeners() {
@@ -157,6 +166,27 @@ class VideoEditor {
         if (copyBtn) copyBtn.addEventListener('click', () => this.copyClip());
         if (pasteBtn) pasteBtn.addEventListener('click', () => this.pasteClip());
         if (duplicateBtn) duplicateBtn.addEventListener('click', () => this.duplicateClip());
+
+        // Quality toggle
+        if (this.elements.qualityToggle) {
+            this.elements.qualityToggle.addEventListener('click', () => this.togglePreviewQuality());
+        }
+
+        // Console toggle
+        if (this.elements.consoleToggle) {
+            this.elements.consoleToggle.addEventListener('click', () => this.toggleConsole());
+        }
+
+        // Console hide button (inside panel)
+        const consoleHideBtn = document.querySelector('.console-hide-btn');
+        if (consoleHideBtn) {
+            consoleHideBtn.addEventListener('click', () => this.toggleConsole());
+        }
+
+        // Console clear
+        if (this.elements.consoleClear) {
+            this.elements.consoleClear.addEventListener('click', () => this.clearConsole());
+        }
     }
 
     renderTracks() {
@@ -192,19 +222,27 @@ class VideoEditor {
     }
 
     setupTrackDropZones() {
-        // Enable drag from media library to timeline
-        this.elements.mediaLibrary.addEventListener('dragstart', (e) => {
-            if (e.target.classList.contains('media-item')) {
-                e.dataTransfer.setData('mediaId', e.target.dataset.mediaId);
-                e.target.classList.add('dragging');
-            }
-        });
+        // Only set up media library drag listeners once
+        if (!this.dragDropListenersSet) {
+            // Enable drag from media library to timeline
+            this.elements.mediaLibrary.addEventListener('dragstart', (e) => {
+                if (e.target.classList.contains('media-item')) {
+                    e.dataTransfer.setData('mediaId', e.target.dataset.mediaId);
+                    e.target.classList.add('dragging');
+                    this.log('Dragging media item: ' + e.target.dataset.mediaId, 'debug');
+                }
+            });
 
-        this.elements.mediaLibrary.addEventListener('dragend', (e) => {
-            e.target.classList.remove('dragging');
-        });
+            this.elements.mediaLibrary.addEventListener('dragend', (e) => {
+                if (e.target.classList.contains('media-item')) {
+                    e.target.classList.remove('dragging');
+                }
+            });
 
-        // Timeline drop zones for all tracks
+            this.dragDropListenersSet = true;
+        }
+
+        // Timeline drop zones for all tracks (these need to be reset when tracks change)
         document.querySelectorAll('.track-content').forEach(trackContent => {
             trackContent.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -225,6 +263,7 @@ class VideoEditor {
                     const x = e.clientX - rect.left;
                     const time = x / this.pixelsPerSecond;
                     const trackId = trackContent.dataset.trackId;
+                    this.log(`Dropped clip at time: ${time.toFixed(2)}s on track: ${trackId}`, 'info');
                     this.addClipToTimeline(mediaId, trackId, time);
                 }
             });
@@ -341,12 +380,14 @@ class VideoEditor {
 
     async handleFileUpload(files) {
         this.showLoading();
+        this.log(`Starting upload of ${files.length} file(s)`, 'info');
 
         for (const file of files) {
             const formData = new FormData();
             formData.append('file', file);
 
             try {
+                this.log(`Uploading: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
                 const response = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
@@ -355,10 +396,14 @@ class VideoEditor {
                 if (response.ok) {
                     const mediaItem = await response.json();
                     this.addMediaItem(mediaItem);
+                    this.log(`Successfully uploaded: ${file.name}`, 'info');
                 } else {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    this.log(`Failed to upload ${file.name}: ${errorData.error || 'Unknown error'}`, 'error');
                     alert('Failed to upload: ' + file.name);
                 }
             } catch (error) {
+                this.log(`Upload error for ${file.name}: ${error.message}`, 'error');
                 console.error('Upload error:', error);
                 alert('Error uploading file: ' + error.message);
             }
@@ -369,57 +414,72 @@ class VideoEditor {
     }
 
     addMediaItem(item) {
-        this.mediaItems.push(item);
+        try {
+            this.mediaItems.push(item);
+            this.log(`Added media item: ${item.originalName} (Type: ${item.type}, Duration: ${item.duration}s)`, 'info');
 
-        // Remove empty state if present
-        const emptyState = this.elements.mediaLibrary.querySelector('.empty-state');
-        if (emptyState) {
-            emptyState.remove();
-        }
-
-        // Create media item element
-        const mediaEl = document.createElement('div');
-        mediaEl.className = 'media-item';
-        mediaEl.draggable = true;
-        mediaEl.dataset.mediaId = item.id;
-
-        const thumbnail = item.thumbnail || item.path;
-        const duration = this.formatTime(item.duration || 0);
-
-        mediaEl.innerHTML = `
-            ${item.type === 'audio' ?
-                `<div class="media-thumbnail" style="display: flex; align-items: center; justify-content: center; background: #2d2d2d;">
-                    <span style="font-size: 2rem;">🎵</span>
-                </div>` :
-                `<img src="${thumbnail}" class="media-thumbnail" alt="${item.originalName}">`
+            // Remove empty state if present
+            const emptyState = this.elements.mediaLibrary.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
             }
-            <div class="media-info">
-                <div class="media-name" title="${item.originalName}">${item.originalName}</div>
-                <div class="media-duration">${duration}</div>
-            </div>
-        `;
 
-        this.elements.mediaLibrary.appendChild(mediaEl);
+            // Create media item element
+            const mediaEl = document.createElement('div');
+            mediaEl.className = 'media-item';
+            mediaEl.draggable = true;
+            mediaEl.dataset.mediaId = item.id;
+
+            const thumbnail = item.thumbnail || item.path;
+            const duration = this.formatTime(item.duration || 0);
+
+            mediaEl.innerHTML = `
+                ${item.type === 'audio' ?
+                    `<div class="media-thumbnail" style="display: flex; align-items: center; justify-content: center; background: #2d2d2d;">
+                        <span style="font-size: 2rem;">🎵</span>
+                    </div>` :
+                    `<img src="${thumbnail}" class="media-thumbnail" alt="${item.originalName}">`
+                }
+                <div class="media-info">
+                    <div class="media-name" title="${item.originalName}">${item.originalName}</div>
+                    <div class="media-duration">${duration}</div>
+                </div>
+            `;
+
+            this.elements.mediaLibrary.appendChild(mediaEl);
+        } catch (error) {
+            this.log(`Error adding media item: ${error.message}`, 'error');
+            console.error('Add media item error:', error);
+        }
     }
 
     addClipToTimeline(mediaId, trackId, startTime) {
-        const mediaItem = this.mediaItems.find(m => m.id === mediaId);
-        if (!mediaItem) return;
+        try {
+            const mediaItem = this.mediaItems.find(m => m.id === mediaId);
+            if (!mediaItem) {
+                this.log(`Error: Media item not found: ${mediaId}`, 'error');
+                return;
+            }
 
-        const clip = {
-            id: this.generateId(),
-            mediaId: mediaId,
-            type: mediaItem.type,
-            start: Math.max(0, startTime),
-            duration: mediaItem.duration || 5,
-            trimStart: 0,
-            trimEnd: mediaItem.duration || 5,
-            trackId: trackId
-        };
+            const clip = {
+                id: this.generateId(),
+                mediaId: mediaId,
+                type: mediaItem.type,
+                start: Math.max(0, startTime),
+                duration: mediaItem.duration || 5,
+                trimStart: 0,
+                trimEnd: mediaItem.duration || 5,
+                trackId: trackId
+            };
 
-        this.timelineClips.push(clip);
-        this.renderTimelineClip(clip);
-        this.updateTimelineDuration();
+            this.timelineClips.push(clip);
+            this.log(`Added clip to timeline: ${mediaItem.originalName} at ${startTime.toFixed(2)}s on track ${trackId}`, 'info');
+            this.renderTimelineClip(clip);
+            this.updateTimelineDuration();
+        } catch (error) {
+            this.log(`Error adding clip to timeline: ${error.message}`, 'error');
+            console.error('Add clip error:', error);
+        }
     }
 
     renderTimelineClip(clip) {
@@ -1291,6 +1351,138 @@ class VideoEditor {
 
     generateId() {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Console logging system
+    setupConsole() {
+        // Intercept console errors
+        window.addEventListener('error', (e) => {
+            this.log(`ERROR: ${e.message} at ${e.filename}:${e.lineno}`, 'error');
+        });
+
+        // Intercept console methods
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+        const originalConsoleLog = console.log;
+
+        console.error = (...args) => {
+            this.log(args.join(' '), 'error');
+            originalConsoleError.apply(console, args);
+        };
+
+        console.warn = (...args) => {
+            this.log(args.join(' '), 'warning');
+            originalConsoleWarn.apply(console, args);
+        };
+
+        console.log = (...args) => {
+            this.log(args.join(' '), 'debug');
+            originalConsoleLog.apply(console, args);
+        };
+    }
+
+    log(message, type = 'info') {
+        // Safe guard - check if console elements exist
+        if (!this.elements || !this.elements.consoleOutput) {
+            // If console not ready, just log to browser console
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            return;
+        }
+
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `console-entry console-${type}`;
+
+        const timeEl = document.createElement('span');
+        timeEl.className = 'console-time';
+        timeEl.textContent = timestamp;
+
+        const typeEl = document.createElement('span');
+        typeEl.className = 'console-type';
+        typeEl.textContent = type.toUpperCase();
+
+        const messageEl = document.createElement('span');
+        messageEl.className = 'console-message';
+        messageEl.textContent = message;
+
+        logEntry.appendChild(timeEl);
+        logEntry.appendChild(typeEl);
+        logEntry.appendChild(messageEl);
+
+        this.elements.consoleOutput.appendChild(logEntry);
+
+        // Auto-scroll to bottom
+        this.elements.consoleOutput.scrollTop = this.elements.consoleOutput.scrollHeight;
+
+        // Limit to last 100 entries
+        const entries = this.elements.consoleOutput.querySelectorAll('.console-entry');
+        if (entries.length > 100) {
+            entries[0].remove();
+        }
+    }
+
+    toggleConsole() {
+        if (this.elements.consolePanel) {
+            this.elements.consolePanel.classList.toggle('active');
+            const isActive = this.elements.consolePanel.classList.contains('active');
+            this.log(`Console ${isActive ? 'opened' : 'closed'}`, 'info');
+        }
+    }
+
+    clearConsole() {
+        if (this.elements.consoleOutput) {
+            this.elements.consoleOutput.innerHTML = '';
+            this.log('Console cleared', 'info');
+        }
+    }
+
+    // Preview quality toggle
+    togglePreviewQuality() {
+        this.previewQuality = this.previewQuality === 'high' ? 'low' : 'high';
+
+        if (this.elements.qualityToggle) {
+            this.elements.qualityToggle.textContent = this.previewQuality === 'high' ? 'High Quality' : 'Low Quality';
+            this.elements.qualityToggle.className = `btn btn-small quality-${this.previewQuality}`;
+        }
+
+        this.log(`Preview quality set to: ${this.previewQuality}`, 'info');
+
+        // If currently playing, reload with new quality
+        if (this.isPlaying) {
+            const currentTime = this.elements.previewPlayer.currentTime;
+            this.updatePreview();
+            this.elements.previewPlayer.currentTime = currentTime;
+        }
+    }
+
+    updatePreview() {
+        // Find the clip at current playhead position
+        const currentClip = this.getClipAtTime(this.currentTime);
+
+        if (currentClip) {
+            const mediaItem = this.mediaItems.find(m => m.id === currentClip.mediaId);
+            if (mediaItem) {
+                // For low quality, we could potentially use a lower resolution version
+                // For now, we'll use the same file but this could be extended to use
+                // different quality files
+                this.elements.previewPlayer.src = mediaItem.path;
+
+                // Set the time within the clip
+                const timeInClip = this.currentTime - currentClip.start;
+                this.elements.previewPlayer.currentTime = currentClip.trimStart + timeInClip;
+
+                this.log(`Updated preview to clip at ${this.currentTime.toFixed(2)}s`, 'debug');
+            }
+        }
+    }
+
+    getClipAtTime(time) {
+        // Find the first video clip that contains this time
+        return this.timelineClips.find(clip => {
+            return clip.type === 'video' &&
+                   time >= clip.start &&
+                   time < (clip.start + clip.duration);
+        });
     }
 }
 

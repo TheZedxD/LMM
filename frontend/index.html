@@ -64,6 +64,7 @@
                         <div class="time-display">
                             <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
                         </div>
+                        <button id="qualityToggle" class="btn btn-small quality-high">High Quality</button>
                     </div>
                 </div>
 
@@ -163,6 +164,21 @@
         <div class="spinner"></div>
         <p>Processing...</p>
     </div>
+
+    <!-- Console Panel -->
+    <div id="consolePanel" class="console-panel">
+        <div class="console-header">
+            <h3>Console Output</h3>
+            <div class="console-actions">
+                <button id="consoleClear" class="btn btn-small">Clear</button>
+                <button class="console-hide-btn btn btn-small">Hide</button>
+            </div>
+        </div>
+        <div id="consoleOutput" class="console-output"></div>
+    </div>
+
+    <!-- Console Toggle Button (fixed position) -->
+    <button id="consoleToggle" class="console-toggle-btn" title="Toggle Console">📊 Console</button>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
