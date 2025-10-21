@@ -29,7 +29,8 @@ app.use('/temp', express.static(path.join(__dirname, '../public/temp')));
 // Ensure directories exist
 const uploadsDir = path.join(__dirname, '../public/uploads');
 const tempDir = path.join(__dirname, '../public/temp');
-[uploadsDir, tempDir].forEach(dir => {
+const projectsDir = path.join(__dirname, '../public/projects');
+[uploadsDir, tempDir, projectsDir].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

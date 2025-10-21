@@ -5,8 +5,10 @@ package-lock.json
 # Uploaded media and temp files
 public/uploads/*
 public/temp/*
+public/projects/*
 !public/uploads/.gitkeep
 !public/temp/.gitkeep
+!public/projects/.gitkeep
 
 # Logs
 *.log

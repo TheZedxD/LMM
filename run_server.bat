@@ -1,6 +1,9 @@
 @echo off
 REM LMM - Lightweight Movie Maker Server Launcher for Windows
 
+REM Change to the script directory
+cd /d "%~dp0"
+
 title LMM Video Editor Server
 
 echo ================================

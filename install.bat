@@ -2,6 +2,9 @@
 REM LMM - Lightweight Movie Maker Installer for Windows
 REM This script installs all dependencies and sets up the application
 
+REM Change to the script directory
+cd /d "%~dp0"
+
 echo ================================
 echo LMM Video Editor Installer
 echo Windows Edition
