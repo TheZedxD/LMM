@@ -91,12 +91,42 @@ else
 fi
 
 echo ""
-echo "Step 3: Installing Node.js dependencies..."
-echo "This may take a while on Raspberry Pi..."
+echo "Step 3: Checking Node.js dependencies..."
 echo ""
 
-# Install npm packages
-npm install
+# Check if node_modules exists and has the main dependencies
+NEED_INSTALL=1
+if [ -d "node_modules" ]; then
+    echo "Checking existing node_modules..."
+    if [ -d "node_modules/express" ] && [ -d "node_modules/multer" ] && [ -d "node_modules/fluent-ffmpeg" ]; then
+        echo "[OK] Dependencies appear to be already installed."
+        echo "Skipping npm install..."
+        NEED_INSTALL=0
+    fi
+fi
+
+if [ $NEED_INSTALL -eq 1 ]; then
+    echo "Installing Node.js dependencies..."
+    echo "This may take a while on Raspberry Pi (15-30 minutes)..."
+    npm install
+
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "ERROR: Failed to install Node.js dependencies"
+        echo ""
+        echo "This might be due to:"
+        echo "  - Network issues"
+        echo "  - Insufficient memory (try closing other applications)"
+        echo "  - Missing build tools"
+        echo ""
+        echo "Try running: npm cache clean --force"
+        echo "Then run this installer again."
+        exit 1
+    fi
+    echo "[OK] Dependencies installed successfully!"
+else
+    echo "To reinstall dependencies, delete the node_modules folder first."
+fi
 
 echo ""
 echo "Step 4: Creating desktop entry (optional)..."
@@ -197,4 +227,6 @@ echo ""
 echo "4. Use the desktop launcher from your application menu"
 echo ""
 echo "The application will be available at: http://localhost:3000"
+echo ""
+echo "To uninstall LMM Video Editor, run: ./uninstall.sh"
 echo ""
