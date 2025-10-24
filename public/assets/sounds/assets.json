@@ -1,0 +1,8 @@
+[
+  {
+    "id": "sound-placeholder",
+    "name": "Add Your Sounds Here",
+    "description": "Drag and drop sound effect files (.mp3, .wav) into the public/assets/sounds folder",
+    "type": "placeholder"
+  }
+]
