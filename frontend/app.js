@@ -14,6 +14,11 @@ class VideoEditor {
         this.previewQuality = 'high'; // 'low' or 'high'
         this.dragDropListenersSet = false; // Track if drag/drop listeners are set
 
+        // Assets for sounds, transitions, effects
+        this.soundAssets = [];
+        this.transitionAssets = [];
+        this.effectAssets = [];
+
         // Multi-track support
         this.tracks = [
             { id: 'video-1', name: 'Video 1', type: 'video' },
@@ -75,6 +80,8 @@ class VideoEditor {
         this.setupContextMenu();
         this.drawTimelineRuler();
         this.setupConsole();
+        this.setupAssetTabs();
+        this.loadAssets();
         this.log('LMM Video Editor initialized successfully', 'info');
     }
 
@@ -531,14 +538,21 @@ class VideoEditor {
     makeClipDraggable(clipEl, clip) {
         let isDragging = false;
         let startX = 0;
+        let startY = 0;
         let startLeft = 0;
+        let currentTrack = null;
 
         const onMouseDown = (e) => {
             if (e.target.classList.contains('clip-handle')) return;
 
             isDragging = true;
             startX = e.clientX;
+            startY = e.clientY;
             startLeft = clip.start * this.pixelsPerSecond;
+            currentTrack = clip.trackId;
+
+            // Add dragging class for visual feedback
+            clipEl.classList.add('dragging');
 
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
@@ -550,15 +564,58 @@ class VideoEditor {
             if (!isDragging) return;
 
             const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
             const newLeft = Math.max(0, startLeft + deltaX);
             const newStart = newLeft / this.pixelsPerSecond;
 
+            // Update horizontal position
             clip.start = newStart;
             clipEl.style.left = newLeft + 'px';
+
+            // Check for track change (vertical movement)
+            const trackContents = document.querySelectorAll('.track-content');
+            let newTrackId = null;
+
+            trackContents.forEach(trackContent => {
+                const rect = trackContent.getBoundingClientRect();
+                if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                    const trackId = trackContent.dataset.trackId;
+                    const track = this.tracks.find(t => t.id === trackId);
+
+                    // Check if clip type matches track type
+                    if (track && track.type === clip.type) {
+                        newTrackId = trackId;
+                        trackContent.classList.add('drop-target');
+                    }
+                } else {
+                    trackContent.classList.remove('drop-target');
+                }
+            });
+
+            // Update track if changed
+            if (newTrackId && newTrackId !== currentTrack) {
+                currentTrack = newTrackId;
+            }
         };
 
         const onMouseUp = () => {
+            if (!isDragging) return;
+
             isDragging = false;
+            clipEl.classList.remove('dragging');
+
+            // Remove drop-target class from all tracks
+            document.querySelectorAll('.track-content').forEach(tc => {
+                tc.classList.remove('drop-target');
+            });
+
+            // Update clip track if it changed
+            if (currentTrack !== clip.trackId) {
+                this.log(`Moved clip to track: ${currentTrack}`, 'info');
+                clip.trackId = currentTrack;
+                this.refreshTimeline();
+            }
+
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
             this.updateProperties();
@@ -1483,6 +1540,148 @@ class VideoEditor {
                    time >= clip.start &&
                    time < (clip.start + clip.duration);
         });
+    }
+
+    // Assets management
+    setupAssetTabs() {
+        const tabs = document.querySelectorAll('.assets-tab');
+        const panels = document.querySelectorAll('.assets-panel');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+
+                // Remove active class from all tabs and panels
+                tabs.forEach(t => t.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding panel
+                tab.classList.add('active');
+                document.getElementById(`${tabName}Panel`).classList.add('active');
+
+                this.log(`Switched to ${tabName} tab`, 'debug');
+            });
+        });
+    }
+
+    async loadAssets() {
+        try {
+            // Load sounds
+            const soundsResponse = await fetch('/api/assets/sounds');
+            if (soundsResponse.ok) {
+                const { assets } = await soundsResponse.json();
+                this.soundAssets = assets;
+                this.renderAssets('sounds', assets);
+                this.log(`Loaded ${assets.length} sound assets`, 'info');
+            }
+
+            // Load transitions
+            const transitionsResponse = await fetch('/api/assets/transitions');
+            if (transitionsResponse.ok) {
+                const { assets } = await transitionsResponse.json();
+                this.transitionAssets = assets;
+                this.renderAssets('transitions', assets);
+                this.log(`Loaded ${assets.length} transition assets`, 'info');
+            }
+
+            // Load effects
+            const effectsResponse = await fetch('/api/assets/effects');
+            if (effectsResponse.ok) {
+                const { assets } = await effectsResponse.json();
+                this.effectAssets = assets;
+                this.renderAssets('effects', assets);
+                this.log(`Loaded ${assets.length} effect assets`, 'info');
+            }
+        } catch (error) {
+            this.log(`Error loading assets: ${error.message}`, 'error');
+            console.error('Asset loading error:', error);
+        }
+    }
+
+    renderAssets(type, assets) {
+        const listId = `${type}List`;
+        const listElement = document.getElementById(listId);
+
+        if (!listElement) return;
+
+        if (assets.length === 0) {
+            listElement.innerHTML = `
+                <div class="empty-state-small">
+                    <p>No ${type} available</p>
+                </div>
+            `;
+            return;
+        }
+
+        listElement.innerHTML = assets.map(asset => {
+            const icon = this.getAssetIcon(type, asset);
+            const meta = this.getAssetMeta(type, asset);
+
+            return `
+                <div class="asset-item" draggable="true" data-asset-type="${type}" data-asset-id="${asset.id}">
+                    <div class="asset-item-header">
+                        <span class="asset-item-icon">${icon}</span>
+                        <span class="asset-item-name">${asset.name}</span>
+                    </div>
+                    ${asset.description ? `<div class="asset-item-description">${asset.description}</div>` : ''}
+                    ${meta ? `<div class="asset-item-meta">${meta}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        // Setup drag and drop for assets
+        this.setupAssetDragDrop();
+    }
+
+    getAssetIcon(type, asset) {
+        if (type === 'sounds') {
+            return '🎵';
+        } else if (type === 'transitions') {
+            return '✨';
+        } else if (type === 'effects') {
+            if (asset.category === 'color') return '🎨';
+            if (asset.category === 'filter') return '🔲';
+            if (asset.category === 'time') return '⏱️';
+            return '🎨';
+        }
+        return '📦';
+    }
+
+    getAssetMeta(type, asset) {
+        if (type === 'transitions' && asset.duration) {
+            return `Duration: ${asset.duration}s`;
+        } else if (type === 'effects' && asset.category) {
+            return `Category: ${asset.category}`;
+        }
+        return '';
+    }
+
+    setupAssetDragDrop() {
+        const assetItems = document.querySelectorAll('.asset-item');
+
+        assetItems.forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('assetType', item.dataset.assetType);
+                e.dataTransfer.setData('assetId', item.dataset.assetId);
+                item.classList.add('dragging');
+                this.log(`Dragging ${item.dataset.assetType} asset: ${item.dataset.assetId}`, 'debug');
+            });
+
+            item.addEventListener('dragend', (e) => {
+                item.classList.remove('dragging');
+            });
+        });
+
+        // Enable dropping assets on clips
+        document.addEventListener('dragover', (e) => {
+            const assetType = e.dataTransfer.types.includes('assettype');
+            if (assetType) {
+                e.preventDefault();
+            }
+        });
+
+        // TODO: Implement actual drop handling for effects and transitions
+        // This will be implemented in the next steps
     }
 }
 

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "blur",
+    "name": "Blur",
+    "description": "Apply blur effect to video",
+    "type": "effect",
+    "category": "filter"
+  },
+  {
+    "id": "brightness",
+    "name": "Brightness",
+    "description": "Adjust video brightness",
+    "type": "effect",
+    "category": "color"
+  },
+  {
+    "id": "contrast",
+    "name": "Contrast",
+    "description": "Adjust video contrast",
+    "type": "effect",
+    "category": "color"
+  },
+  {
+    "id": "saturation",
+    "name": "Saturation",
+    "description": "Adjust color saturation",
+    "type": "effect",
+    "category": "color"
+  },
+  {
+    "id": "grayscale",
+    "name": "Grayscale",
+    "description": "Convert video to grayscale",
+    "type": "effect",
+    "category": "filter"
+  },
+  {
+    "id": "sepia",
+    "name": "Sepia",
+    "description": "Apply sepia tone effect",
+    "type": "effect",
+    "category": "filter"
+  },
+  {
+    "id": "vignette",
+    "name": "Vignette",
+    "description": "Add vignette effect to edges",
+    "type": "effect",
+    "category": "filter"
+  },
+  {
+    "id": "speed",
+    "name": "Speed",
+    "description": "Adjust playback speed",
+    "type": "effect",
+    "category": "time"
+  }
+]

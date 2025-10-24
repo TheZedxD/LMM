@@ -1,0 +1,37 @@
+[
+  {
+    "id": "fade",
+    "name": "Fade",
+    "description": "Simple fade transition between clips",
+    "duration": 1.0,
+    "type": "transition"
+  },
+  {
+    "id": "crossfade",
+    "name": "Cross Fade",
+    "description": "Smooth cross-fade transition",
+    "duration": 1.5,
+    "type": "transition"
+  },
+  {
+    "id": "wipe-left",
+    "name": "Wipe Left",
+    "description": "Wipe transition from right to left",
+    "duration": 1.0,
+    "type": "transition"
+  },
+  {
+    "id": "wipe-right",
+    "name": "Wipe Right",
+    "description": "Wipe transition from left to right",
+    "duration": 1.0,
+    "type": "transition"
+  },
+  {
+    "id": "dissolve",
+    "name": "Dissolve",
+    "description": "Dissolve transition between clips",
+    "duration": 1.5,
+    "type": "transition"
+  }
+]

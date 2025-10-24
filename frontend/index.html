@@ -31,17 +31,49 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Left Sidebar - Media Library -->
+            <!-- Left Sidebar - Media Library and Assets -->
             <aside class="sidebar">
-                <div class="sidebar-header">
-                    <h2>Media Library</h2>
-                    <button id="uploadBtn" class="btn btn-small">+ Add Media</button>
-                    <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*" style="display: none;">
+                <!-- Top Section: Media Library -->
+                <div class="sidebar-section media-section">
+                    <div class="sidebar-header">
+                        <h2>Media Library</h2>
+                        <button id="uploadBtn" class="btn btn-small">+ Add Media</button>
+                        <input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*" style="display: none;">
+                    </div>
+                    <div id="mediaLibrary" class="media-library">
+                        <div class="empty-state">
+                            <p>📁</p>
+                            <p>Drag and drop media files here<br>or click "Add Media"</p>
+                        </div>
+                    </div>
                 </div>
-                <div id="mediaLibrary" class="media-library">
-                    <div class="empty-state">
-                        <p>📁</p>
-                        <p>Drag and drop media files here<br>or click "Add Media"</p>
+
+                <!-- Bottom Section: Assets Browser -->
+                <div class="sidebar-section assets-section">
+                    <div class="sidebar-header">
+                        <h2>Assets</h2>
+                    </div>
+                    <div class="assets-tabs">
+                        <button class="assets-tab active" data-tab="sounds">🎵 Sounds</button>
+                        <button class="assets-tab" data-tab="transitions">✨ Transitions</button>
+                        <button class="assets-tab" data-tab="effects">🎨 Effects</button>
+                    </div>
+                    <div class="assets-content">
+                        <div id="soundsPanel" class="assets-panel active">
+                            <div class="assets-list" id="soundsList">
+                                <div class="loading-assets">Loading sounds...</div>
+                            </div>
+                        </div>
+                        <div id="transitionsPanel" class="assets-panel">
+                            <div class="assets-list" id="transitionsList">
+                                <div class="loading-assets">Loading transitions...</div>
+                            </div>
+                        </div>
+                        <div id="effectsPanel" class="assets-panel">
+                            <div class="assets-list" id="effectsList">
+                                <div class="loading-assets">Loading effects...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </aside>

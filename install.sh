@@ -106,9 +106,16 @@ echo "Step 1: Installing system dependencies..."
 echo "You may be asked for your sudo password."
 echo ""
 
+# Verify sudo access before proceeding
+if ! sudo -v; then
+    echo "ERROR: Unable to obtain sudo privileges."
+    echo "This installer requires sudo access to install system packages."
+    exit 1
+fi
+
 # Install based on detected distribution
 case $DISTRO in
-    arch|cachyos|manjaro|endeavouros)
+    arch|cachyos|manjaro|endeavouros|garuda)
         install_arch
         ;;
     ubuntu|debian|linuxmint|pop)
