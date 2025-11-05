@@ -8,6 +8,7 @@ class VideoEditor {
         this.pixelsPerSecond = 50;
         this.isPlaying = false;
         this.currentTime = 0;
+        this.currentPlayingClip = null;
         this.socket = null;
         this.projectId = null;
         this.projectName = 'Untitled Project';
@@ -941,18 +942,56 @@ class VideoEditor {
             return;
         }
 
-        // For now, play the first video clip
-        const firstVideoClip = this.timelineClips.find(c => c.type === 'video');
-        if (firstVideoClip) {
-            const mediaItem = this.mediaItems.find(m => m.id === firstVideoClip.mediaId);
-            if (mediaItem) {
-                this.elements.previewPlayer.src = mediaItem.path;
-                this.elements.previewPlayer.currentTime = firstVideoClip.trimStart;
-                this.elements.previewPlayer.classList.add('active');
-                this.elements.previewPlayer.play();
-                this.isPlaying = true;
-            }
+        // Get sorted video clips by timeline start position
+        const videoClips = this.timelineClips
+            .filter(c => c.type === 'video')
+            .sort((a, b) => a.start - b.start);
+
+        if (videoClips.length === 0) {
+            alert('Add video clips to the timeline first');
+            return;
         }
+
+        // Find the clip at current timeline position
+        let currentClip = videoClips.find(clip =>
+            this.currentTime >= clip.start &&
+            this.currentTime < (clip.start + clip.duration)
+        );
+
+        // If no clip at current position, start from beginning
+        if (!currentClip) {
+            currentClip = videoClips[0];
+            this.currentTime = currentClip.start;
+        }
+
+        // Load and play the current clip
+        this.playClip(currentClip);
+        this.isPlaying = true;
+        this.log(`Playing timeline from ${this.formatTime(this.currentTime)}`, 'info');
+    }
+
+    playClip(clip) {
+        const mediaItem = this.mediaItems.find(m => m.id === clip.mediaId);
+        if (!mediaItem) {
+            this.log('Error: Media item not found for clip', 'error');
+            return;
+        }
+
+        // Calculate position within the clip
+        const timeInClip = this.currentTime - clip.start;
+        const videoTime = clip.trimStart + timeInClip;
+
+        this.elements.previewPlayer.src = mediaItem.path;
+        this.elements.previewPlayer.currentTime = videoTime;
+        this.elements.previewPlayer.classList.add('active');
+
+        // Store current clip for timeline tracking
+        this.currentPlayingClip = clip;
+
+        this.elements.previewPlayer.play().catch(err => {
+            this.log(`Playback error: ${err.message}`, 'error');
+            this.isPlaying = false;
+        });
     }
 
     pause() {
@@ -964,23 +1003,64 @@ class VideoEditor {
         this.elements.previewPlayer.pause();
         this.elements.previewPlayer.currentTime = 0;
         this.isPlaying = false;
+        this.currentTime = 0;
+        this.currentPlayingClip = null;
         this.elements.playhead.style.left = '80px';
+        this.elements.currentTime.textContent = '00:00';
+        this.log('Playback stopped', 'info');
     }
 
     updatePlayhead() {
         if (!this.isPlaying) return;
 
-        const currentTime = this.elements.previewPlayer.currentTime;
-        this.elements.currentTime.textContent = this.formatTime(currentTime);
+        // Update timeline current time based on playing clip
+        if (this.currentPlayingClip) {
+            const clip = this.currentPlayingClip;
+            const videoTime = this.elements.previewPlayer.currentTime;
 
-        // Update playhead position
-        const position = 80 + (currentTime * this.pixelsPerSecond);
-        this.elements.playhead.style.left = position + 'px';
+            // Calculate timeline position
+            const timeInClip = videoTime - clip.trimStart;
+            this.currentTime = clip.start + timeInClip;
+
+            // Check if we've reached the end of the current clip
+            if (videoTime >= clip.trimEnd || this.currentTime >= (clip.start + clip.duration)) {
+                // Move to next clip
+                this.playNextClip();
+                return;
+            }
+
+            // Update display
+            this.elements.currentTime.textContent = this.formatTime(this.currentTime);
+
+            // Update playhead position (80px offset for timeline ruler)
+            const position = 80 + (this.currentTime * this.pixelsPerSecond);
+            this.elements.playhead.style.left = position + 'px';
+        }
+    }
+
+    playNextClip() {
+        // Get all video clips sorted by timeline position
+        const videoClips = this.timelineClips
+            .filter(c => c.type === 'video')
+            .sort((a, b) => a.start - b.start);
+
+        // Find next clip after current position
+        const nextClip = videoClips.find(clip => clip.start > this.currentTime);
+
+        if (nextClip) {
+            this.currentTime = nextClip.start;
+            this.playClip(nextClip);
+            this.log(`Playing next clip: ${nextClip.id}`, 'debug');
+        } else {
+            // End of timeline
+            this.onVideoEnded();
+        }
     }
 
     onVideoEnded() {
         this.isPlaying = false;
-        // Could implement playing next clip here
+        this.currentPlayingClip = null;
+        this.log('Timeline playback ended', 'info');
     }
 
     zoomTimeline(factor) {
@@ -1074,18 +1154,34 @@ class VideoEditor {
         document.getElementById('exportProgress').style.display = 'block';
         document.getElementById('startExport').disabled = true;
 
-        // Prepare clips data
-        const clips = this.timelineClips.map(clip => {
-            const mediaItem = this.mediaItems.find(m => m.id === clip.mediaId);
-            return {
-                path: mediaItem.path,
-                type: clip.type,
-                start: clip.trimStart,
-                end: clip.trimEnd,
-                duration: clip.duration,
-                timelineStart: clip.start
-            };
-        });
+        this.log('Starting video export...', 'info');
+
+        // Sort clips by timeline position and prepare data
+        const sortedClips = this.timelineClips
+            .sort((a, b) => {
+                // Sort by track type first (video before audio), then by timeline position
+                if (a.type !== b.type) {
+                    return a.type === 'video' ? -1 : 1;
+                }
+                return a.start - b.start;
+            })
+            .map(clip => {
+                const mediaItem = this.mediaItems.find(m => m.id === clip.mediaId);
+                if (!mediaItem) {
+                    this.log(`Warning: Media item not found for clip ${clip.id}`, 'warning');
+                }
+                return {
+                    path: mediaItem ? mediaItem.path : '',
+                    type: clip.type,
+                    trimStart: clip.trimStart,
+                    trimEnd: clip.trimEnd,
+                    duration: clip.duration,
+                    timelineStart: clip.start,
+                    trackId: clip.trackId
+                };
+            });
+
+        this.log(`Exporting ${sortedClips.length} clips (${sortedClips.filter(c => c.type === 'video').length} video, ${sortedClips.filter(c => c.type === 'audio').length} audio)`, 'info');
 
         try {
             const response = await fetch('/api/export', {
@@ -1094,7 +1190,7 @@ class VideoEditor {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    clips: clips,
+                    clips: sortedClips,
                     settings: {
                         format: format,
                         quality: quality,
@@ -1112,13 +1208,16 @@ class VideoEditor {
                 link.download = result.filename;
                 link.click();
 
+                this.log('Video exported successfully!', 'info');
                 alert('Video exported successfully!');
                 this.hideExportModal();
             } else {
                 const error = await response.json();
+                this.log(`Export failed: ${error.error}`, 'error');
                 alert('Export failed: ' + error.error);
             }
         } catch (error) {
+            this.log(`Export error: ${error.message}`, 'error');
             console.error('Export error:', error);
             alert('Export failed: ' + error.message);
         } finally {

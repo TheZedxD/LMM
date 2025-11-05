@@ -255,9 +255,13 @@ function exportVideo(clips, settings, outputPath, callback) {
 
   logger.info(`Starting export with quality: ${settings.quality}, format: ${settings.format}`);
 
-  // Separate video and audio clips
-  const videoClips = clips.filter(c => c.type === 'video' || c.type === 'image');
-  const audioClips = clips.filter(c => c.type === 'audio');
+  // Separate video and audio clips, sort by timeline position
+  const videoClips = clips
+    .filter(c => c.type === 'video' || c.type === 'image')
+    .sort((a, b) => a.timelineStart - b.timelineStart);
+  const audioClips = clips
+    .filter(c => c.type === 'audio')
+    .sort((a, b) => a.timelineStart - b.timelineStart);
 
   if (videoClips.length === 0) {
     return callback(new Error('No video clips to export'));
@@ -266,16 +270,19 @@ function exportVideo(clips, settings, outputPath, callback) {
   // Determine quality settings
   const qualitySettings = getQualitySettings(settings.quality);
   logger.info(`Using quality settings: ${qualitySettings.resolution}, CRF: ${qualitySettings.crf}`);
+  logger.info(`Exporting ${videoClips.length} video clips and ${audioClips.length} audio clips`);
 
-  // For simple case: single video clip with trim
-  if (videoClips.length === 1 && videoClips[0].type === 'video') {
+  // For simple case: single video clip with trim and no additional audio
+  if (videoClips.length === 1 && audioClips.length === 0 && videoClips[0].type === 'video') {
     const clip = videoClips[0];
     const inputPath = path.join(__dirname, '..', clip.path);
 
+    logger.info(`Simple export: single clip from ${clip.trimStart}s to ${clip.trimEnd}s`);
+
     const command = ffmpeg()
       .input(inputPath)
-      .setStartTime(clip.start || 0)
-      .setDuration(clip.duration || clip.end - clip.start);
+      .setStartTime(clip.trimStart || 0)
+      .setDuration(clip.duration || (clip.trimEnd - clip.trimStart));
 
     // Apply quality settings
     const outputOptions = [
@@ -283,7 +290,7 @@ function exportVideo(clips, settings, outputPath, callback) {
       '-preset fast',
       `-crf ${qualitySettings.crf}`,
       '-c:a aac',
-      '-b:a 192k'  // Increased audio bitrate
+      '-b:a 192k'
     ];
 
     // Apply resolution scaling if specified
@@ -313,8 +320,8 @@ function exportVideo(clips, settings, outputPath, callback) {
       })
       .run();
   } else {
-    // Multiple clips - need concat demuxer with audio mixing
-    exportMultipleClips(clips, settings, outputPath, callback);
+    // Multiple clips or audio mixing - need complex processing
+    exportMultipleClips(clips, videoClips, audioClips, settings, outputPath, callback);
   }
 }
 
@@ -349,55 +356,65 @@ function getQualitySettings(quality) {
 }
 
 // Export multiple clips
-function exportMultipleClips(clips, settings, outputPath, callback) {
-  const concatFile = path.join(tempDir, `concat-${uuidv4()}.txt`);
+function exportMultipleClips(allClips, videoClips, audioClips, settings, outputPath, callback) {
   const processedClips = [];
-
-  // Separate video and audio clips
-  const videoClips = clips.filter(c => c.type === 'video' || c.type === 'image');
-  const audioClips = clips.filter(c => c.type === 'audio');
 
   logger.info(`Processing ${videoClips.length} video clips and ${audioClips.length} audio clips`);
 
   // Get quality settings
   const qualitySettings = getQualitySettings(settings.quality);
 
-  // Process each clip first
+  // Process each video clip: trim and normalize
   let processed = 0;
   const totalClips = videoClips.length;
+
+  if (totalClips === 0) {
+    return callback(new Error('No video clips to process'));
+  }
 
   videoClips.forEach((clip, index) => {
     const inputPath = path.join(__dirname, '..', clip.path);
     const tempClipPath = path.join(tempDir, `clip-${index}-${uuidv4()}.mp4`);
 
+    logger.debug(`Processing clip ${index + 1}/${totalClips}: ${clip.path}`);
+
     const cmd = ffmpeg(inputPath);
 
-    if (clip.start !== undefined) {
-      cmd.setStartTime(clip.start);
+    // Use trimStart and trimEnd for accurate trimming
+    if (clip.trimStart !== undefined) {
+      cmd.setStartTime(clip.trimStart);
     }
     if (clip.duration !== undefined) {
       cmd.setDuration(clip.duration);
-    } else if (clip.end !== undefined && clip.start !== undefined) {
-      cmd.setDuration(clip.end - clip.start);
+    } else if (clip.trimEnd !== undefined && clip.trimStart !== undefined) {
+      cmd.setDuration(clip.trimEnd - clip.trimStart);
     }
 
     const outputOptions = [
       '-c:v libx264',
       '-preset ultrafast',
       '-c:a aac',
-      '-b:a 192k'
+      '-b:a 192k',
+      '-ar 48000'
     ];
 
-    // Apply resolution scaling
+    // Apply resolution scaling to normalize all clips
     if (qualitySettings.scale) {
-      outputOptions.push(`-vf scale=${qualitySettings.scale}`);
+      outputOptions.push(`-vf scale=${qualitySettings.scale}:force_original_aspect_ratio=decrease,pad=${qualitySettings.scale}:(ow-iw)/2:(oh-ih)/2`);
     }
 
     cmd
       .outputOptions(outputOptions)
       .output(tempClipPath)
+      .on('start', (cmdLine) => {
+        logger.debug(`Processing clip ${index + 1}: ${cmdLine}`);
+      })
       .on('end', () => {
-        processedClips[index] = tempClipPath;
+        processedClips[index] = {
+          path: tempClipPath,
+          timelineStart: clip.timelineStart,
+          duration: clip.duration
+        };
         processed++;
         logger.debug(`Processed clip ${processed}/${totalClips}`);
 
@@ -407,7 +424,7 @@ function exportMultipleClips(clips, settings, outputPath, callback) {
         }
       })
       .on('error', (err) => {
-        logger.error('Clip processing error', err);
+        logger.error(`Clip processing error for clip ${index + 1}`, err);
         callback(err);
       })
       .run();
@@ -415,11 +432,15 @@ function exportMultipleClips(clips, settings, outputPath, callback) {
 }
 
 // Concatenate clips with audio mixing
-function concatenateClips(clipPaths, audioClips, settings, outputPath, callback) {
+function concatenateClips(processedClips, audioClips, settings, outputPath, callback) {
   const concatFile = path.join(tempDir, `concat-${uuidv4()}.txt`);
+
+  // Extract just the paths for concatenation
+  const clipPaths = processedClips.map(c => c.path);
   const fileList = clipPaths.map(p => `file '${p}'`).join('\n');
 
   fs.writeFileSync(concatFile, fileList);
+  logger.info('Created concat file for video clips');
 
   const qualitySettings = getQualitySettings(settings.quality);
   const command = ffmpeg();
