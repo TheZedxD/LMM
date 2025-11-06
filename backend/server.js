@@ -154,8 +154,19 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
           fileInfo.duration = metadata.format.duration || 0;
           fileInfo.width = videoStream ? videoStream.width : 0;
           fileInfo.height = videoStream ? videoStream.height : 0;
-          fileInfo.fps = videoStream ? eval(videoStream.r_frame_rate) : 30;
-          logger.success(`Video metadata extracted: ${fileInfo.width}x${fileInfo.height}, ${fileInfo.duration.toFixed(2)}s`);
+          // Parse frame rate safely (e.g., "30/1" or "29.97")
+          if (videoStream && videoStream.r_frame_rate) {
+            const fpsStr = videoStream.r_frame_rate;
+            if (fpsStr.includes('/')) {
+              const [num, den] = fpsStr.split('/').map(Number);
+              fileInfo.fps = den > 0 ? num / den : 30;
+            } else {
+              fileInfo.fps = parseFloat(fpsStr) || 30;
+            }
+          } else {
+            fileInfo.fps = 30;
+          }
+          logger.success(`Video metadata extracted: ${fileInfo.width}x${fileInfo.height}, ${fileInfo.duration.toFixed(2)}s, ${fileInfo.fps.toFixed(2)}fps`);
         }
 
         // Generate thumbnail
@@ -542,11 +553,23 @@ app.post('/api/trim', (req, res) => {
     .run();
 });
 
+// Helper function to validate project IDs (prevent directory traversal)
+function isValidProjectId(projectId) {
+  // Allow only alphanumeric characters, hyphens, and underscores
+  return /^[a-zA-Z0-9_-]+$/.test(projectId);
+}
+
 // Save project
 app.post('/api/project/save', (req, res) => {
   try {
     const { project } = req.body;
     const projectId = project.id || uuidv4();
+
+    // Validate project ID
+    if (!isValidProjectId(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
+
     const projectsDir = path.join(__dirname, '../public/projects');
 
     if (!fs.existsSync(projectsDir)) {
@@ -556,12 +579,14 @@ app.post('/api/project/save', (req, res) => {
     const projectFile = path.join(projectsDir, `${projectId}.json`);
     fs.writeFileSync(projectFile, JSON.stringify(project, null, 2));
 
+    logger.success(`Project saved: ${projectId}`);
     res.json({
       success: true,
       projectId: projectId,
       filename: `${projectId}.json`
     });
   } catch (error) {
+    logger.error('Project save error', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -570,6 +595,12 @@ app.post('/api/project/save', (req, res) => {
 app.get('/api/project/load/:projectId', (req, res) => {
   try {
     const { projectId } = req.params;
+
+    // Validate project ID to prevent directory traversal
+    if (!isValidProjectId(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
+
     const projectsDir = path.join(__dirname, '../public/projects');
     const projectFile = path.join(projectsDir, `${projectId}.json`);
 
@@ -578,8 +609,10 @@ app.get('/api/project/load/:projectId', (req, res) => {
     }
 
     const projectData = fs.readFileSync(projectFile, 'utf8');
+    logger.success(`Project loaded: ${projectId}`);
     res.json(JSON.parse(projectData));
   } catch (error) {
+    logger.error('Project load error', error);
     res.status(500).json({ error: error.message });
   }
 });

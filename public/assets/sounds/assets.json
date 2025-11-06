@@ -1,8 +1,23 @@
 [
   {
-    "id": "sound-placeholder",
-    "name": "Add Your Sounds Here",
-    "description": "Drag and drop sound effect files (.mp3, .wav) into the public/assets/sounds folder",
-    "type": "placeholder"
+    "id": "sound-1",
+    "name": "Whoosh",
+    "description": "Swoosh sound effect",
+    "file": "whoosh.mp3",
+    "duration": 1.5
+  },
+  {
+    "id": "sound-2",
+    "name": "Pop",
+    "description": "Pop sound effect",
+    "file": "pop.mp3",
+    "duration": 0.5
+  },
+  {
+    "id": "sound-3",
+    "name": "Click",
+    "description": "Click sound effect",
+    "file": "click.mp3",
+    "duration": 0.3
   }
 ]
