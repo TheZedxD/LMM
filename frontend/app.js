@@ -86,6 +86,49 @@ class VideoEditor {
         this.log('LMM Video Editor initialized successfully', 'info');
     }
 
+    // Toast notification system
+    showToast(message, type = 'info', duration = 4000) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        // Icons for different toast types
+        const icons = {
+            success: '✓',
+            error: '✗',
+            warning: '⚠',
+            info: 'ℹ'
+        };
+
+        toast.innerHTML = `
+            <span class="toast-icon">${icons[type] || icons.info}</span>
+            <span class="toast-message">${message}</span>
+            <button class="toast-close">×</button>
+        `;
+
+        container.appendChild(toast);
+
+        // Close button handler
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => {
+            this.removeToast(toast);
+        });
+
+        // Auto-remove after duration
+        setTimeout(() => {
+            this.removeToast(toast);
+        }, duration);
+    }
+
+    removeToast(toast) {
+        toast.classList.add('hiding');
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }
+
     setupEventListeners() {
         // Upload
         this.elements.uploadBtn.addEventListener('click', () => {
@@ -297,7 +340,7 @@ class VideoEditor {
 
         const tracksOfType = this.tracks.filter(t => t.type === track.type);
         if (tracksOfType.length <= 1) {
-            alert(`Cannot remove the last ${track.type} track`);
+            this.showToast(`Cannot remove the last ${track.type} track`, 'warning');
             return;
         }
 
@@ -408,12 +451,12 @@ class VideoEditor {
                 } else {
                     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
                     this.log(`Failed to upload ${file.name}: ${errorData.error || 'Unknown error'}`, 'error');
-                    alert('Failed to upload: ' + file.name);
+                    this.showToast('Failed to upload: ' + file.name, 'error');
                 }
             } catch (error) {
                 this.log(`Upload error for ${file.name}: ${error.message}`, 'error');
                 console.error('Upload error:', error);
-                alert('Error uploading file: ' + error.message);
+                this.showToast('Error uploading file: ' + error.message, 'error');
             }
         }
 
@@ -816,7 +859,7 @@ class VideoEditor {
     // Editing Tools
     splitClip() {
         if (!this.selectedClip) {
-            alert('Select a clip first');
+            this.showToast('Select a clip first', 'warning');
             return;
         }
 
@@ -825,7 +868,7 @@ class VideoEditor {
 
         // Check if playhead is within clip bounds
         if (playheadTime <= clip.start || playheadTime >= clip.start + clip.duration) {
-            alert('Playhead must be within the clip bounds');
+            this.showToast('Playhead must be within the clip bounds', 'warning');
             return;
         }
 
@@ -858,7 +901,7 @@ class VideoEditor {
 
     cutClip() {
         if (!this.selectedClip) {
-            alert('Select a clip first');
+            this.showToast('Select a clip first', 'warning');
             return;
         }
 
@@ -870,7 +913,7 @@ class VideoEditor {
 
     copyClip() {
         if (!this.selectedClip) {
-            alert('Select a clip first');
+            this.showToast('Select a clip first', 'warning');
             return;
         }
 
@@ -880,7 +923,7 @@ class VideoEditor {
 
     pasteClip() {
         if (!this.clipboard) {
-            alert('Nothing to paste');
+            this.showToast('Nothing to paste', 'warning');
             return;
         }
 
@@ -907,7 +950,7 @@ class VideoEditor {
 
     duplicateClip() {
         if (!this.selectedClip) {
-            alert('Select a clip first');
+            this.showToast('Select a clip first', 'warning');
             return;
         }
 
@@ -938,7 +981,7 @@ class VideoEditor {
 
     play() {
         if (this.timelineClips.length === 0) {
-            alert('Add clips to the timeline first');
+            this.showToast('Add clips to the timeline first', 'warning');
             return;
         }
 
@@ -948,7 +991,7 @@ class VideoEditor {
             .sort((a, b) => a.start - b.start);
 
         if (videoClips.length === 0) {
-            alert('Add video clips to the timeline first');
+            this.showToast('Add video clips to the timeline first', 'warning');
             return;
         }
 
@@ -1136,7 +1179,7 @@ class VideoEditor {
 
     showExportModal() {
         if (this.timelineClips.length === 0) {
-            alert('Add clips to the timeline before exporting');
+            this.showToast('Add clips to the timeline before exporting', 'warning');
             return;
         }
         this.elements.exportModal.classList.add('active');
@@ -1209,17 +1252,17 @@ class VideoEditor {
                 link.click();
 
                 this.log('Video exported successfully!', 'info');
-                alert('Video exported successfully!');
+                this.showToast('Video exported successfully!', 'success');
                 this.hideExportModal();
             } else {
                 const error = await response.json();
                 this.log(`Export failed: ${error.error}`, 'error');
-                alert('Export failed: ' + error.error);
+                this.showToast('Export failed: ' + error.error, 'error');
             }
         } catch (error) {
             this.log(`Export error: ${error.message}`, 'error');
             console.error('Export error:', error);
-            alert('Export failed: ' + error.message);
+            this.showToast('Export failed: ' + error.message, 'error');
         } finally {
             document.getElementById('exportProgress').style.display = 'none';
             document.getElementById('startExport').disabled = false;
@@ -1361,13 +1404,13 @@ class VideoEditor {
             if (response.ok) {
                 const result = await response.json();
                 this.projectId = result.projectId;
-                alert('Project saved successfully!');
+                this.showToast('Project saved successfully!', 'success');
             } else {
-                alert('Failed to save project');
+                this.showToast('Failed to save project', 'error');
             }
         } catch (error) {
             console.error('Save error:', error);
-            alert('Error saving project: ' + error.message);
+            this.showToast('Error saving project: ' + error.message, 'error');
         }
     }
 
@@ -1456,13 +1499,13 @@ class VideoEditor {
                 this.updateProperties();
 
                 this.elements.loadProjectModal.classList.remove('active');
-                alert('Project loaded successfully!');
+                this.showToast('Project loaded successfully!', 'success');
             } else {
-                alert('Failed to load project');
+                this.showToast('Failed to load project', 'error');
             }
         } catch (error) {
             console.error('Load project error:', error);
-            alert('Error loading project: ' + error.message);
+            this.showToast('Error loading project: ' + error.message, 'error');
         }
     }
 
@@ -1771,7 +1814,7 @@ class VideoEditor {
             });
         });
 
-        // Enable dropping assets on clips
+        // Enable dropping assets on timeline clips
         document.addEventListener('dragover', (e) => {
             const assetType = e.dataTransfer.types.includes('assettype');
             if (assetType) {
@@ -1779,8 +1822,98 @@ class VideoEditor {
             }
         });
 
-        // TODO: Implement actual drop handling for effects and transitions
-        // This will be implemented in the next steps
+        // Handle dropping assets onto clips
+        document.addEventListener('drop', (e) => {
+            const assetType = e.dataTransfer.getData('assetType');
+            const assetId = e.dataTransfer.getData('assetId');
+
+            if (!assetType || !assetId) return;
+
+            // Check if dropped on a timeline clip
+            const clipElement = e.target.closest('.timeline-clip');
+            if (!clipElement) {
+                this.showToast('Drop asset onto a timeline clip', 'info');
+                return;
+            }
+
+            const clipId = clipElement.dataset.clipId;
+            const clip = this.timelineClips.find(c => c.id === clipId);
+
+            if (!clip) return;
+
+            // Find the asset
+            let asset = null;
+            if (assetType === 'sounds') {
+                asset = this.soundAssets.find(a => a.id === assetId);
+            } else if (assetType === 'transitions') {
+                asset = this.transitionAssets.find(a => a.id === assetId);
+            } else if (assetType === 'effects') {
+                asset = this.effectAssets.find(a => a.id === assetId);
+            }
+
+            if (!asset) {
+                this.showToast('Asset not found', 'error');
+                return;
+            }
+
+            // Apply the asset to the clip
+            this.applyAssetToClip(clip, assetType, asset);
+            e.preventDefault();
+        });
+    }
+
+    applyAssetToClip(clip, assetType, asset) {
+        // Initialize effects/transitions arrays if not present
+        if (!clip.effects) clip.effects = [];
+        if (!clip.transitions) clip.transitions = [];
+
+        if (assetType === 'sounds') {
+            // For sounds, add as an audio overlay (not implemented fully yet)
+            this.showToast(`Sound "${asset.name}" would be added to clip (feature coming soon)`, 'info');
+            this.log(`Applied sound "${asset.name}" to clip ${clip.id}`, 'info');
+        } else if (assetType === 'transitions') {
+            // Add transition to clip
+            clip.transitions.push({
+                id: asset.id,
+                name: asset.name,
+                type: asset.type || 'fade',
+                duration: asset.duration || 1
+            });
+            this.showToast(`Transition "${asset.name}" applied to clip`, 'success');
+            this.log(`Applied transition "${asset.name}" to clip ${clip.id}`, 'info');
+        } else if (assetType === 'effects') {
+            // Add effect to clip
+            clip.effects.push({
+                id: asset.id,
+                name: asset.name,
+                type: asset.type || 'filter',
+                category: asset.category,
+                parameters: asset.parameters || {}
+            });
+            this.showToast(`Effect "${asset.name}" applied to clip`, 'success');
+            this.log(`Applied effect "${asset.name}" to clip ${clip.id}`, 'info');
+        }
+
+        // Update properties panel if this clip is selected
+        if (this.selectedClip && this.selectedClip.id === clip.id) {
+            this.updateProperties();
+        }
+
+        // Visual feedback on the clip
+        const clipElement = document.querySelector(`[data-clip-id="${clip.id}"]`);
+        if (clipElement) {
+            clipElement.classList.add('has-effects');
+            // Add a visual indicator
+            let indicator = clipElement.querySelector('.clip-effects-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'clip-effects-indicator';
+                clipElement.appendChild(indicator);
+            }
+            const effectCount = (clip.effects?.length || 0) + (clip.transitions?.length || 0);
+            indicator.textContent = effectCount > 0 ? `${effectCount}` : '';
+            indicator.style.display = effectCount > 0 ? 'flex' : 'none';
+        }
     }
 }
 
